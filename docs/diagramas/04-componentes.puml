@@ -1,0 +1,87 @@
+@startuml Diagrama de Componentes - Arquitectura en Capas
+
+skinparam component {
+    BackgroundColor<<controller>> LightBlue
+    BackgroundColor<<service>> LightGreen
+    BackgroundColor<<repository>> LightYellow
+    BackgroundColor<<external>> LightGray
+}
+
+package "Presentation Layer" {
+    [TicketController] <<controller>>
+    [AdminController] <<controller>>
+    [WebSocketHandler] <<controller>>
+}
+
+package "Business Layer" {
+    [TicketService] <<service>>
+    [AssignmentService] <<service>>
+    [QueueService] <<service>>
+    [TelegramService] <<service>>
+    [AuditService] <<service>>
+}
+
+package "Data Access Layer" {
+    [TicketRepository] <<repository>>
+    [AdvisorRepository] <<repository>>
+    [MessageRepository] <<repository>>
+    [AuditEventRepository] <<repository>>
+}
+
+package "Scheduled Tasks" {
+    [MessageScheduler]
+    [PositionRecalculator]
+}
+
+database "PostgreSQL 15" as DB
+database "Redis 7" as Cache
+cloud "Telegram Bot API" as Telegram
+
+' Relaciones Presentation -> Business
+[TicketController] --> [TicketService]
+[TicketController] --> [QueueService]
+[AdminController] --> [QueueService]
+[AdminController] --> [AuditService]
+[WebSocketHandler] --> [QueueService]
+
+' Relaciones Business -> Business
+[TicketService] --> [TelegramService]
+[TicketService] --> [AuditService]
+[AssignmentService] --> [AuditService]
+
+' Relaciones Business -> Data Access
+[TicketService] --> [TicketRepository]
+[AssignmentService] --> [AdvisorRepository]
+[AssignmentService] --> [TicketRepository]
+[QueueService] --> [TicketRepository]
+[QueueService] --> [AdvisorRepository]
+[TelegramService] --> [MessageRepository]
+[AuditService] --> [AuditEventRepository]
+
+' Relaciones Schedulers
+[MessageScheduler] --> [TelegramService]
+[PositionRecalculator] --> [TicketService]
+
+' Relaciones con infraestructura
+[TicketRepository] --> DB
+[AdvisorRepository] --> DB
+[MessageRepository] --> DB
+[AuditEventRepository] --> DB
+
+[TelegramService] --> Cache : Cola mensajes
+[QueueService] --> Cache : Cache estadísticas
+[TelegramService] --> Telegram : HTTP API
+
+note right of [MessageScheduler]
+  @Scheduled(fixedDelay = 5000)
+  Procesa cola de mensajes
+  Implementa reintentos
+end note
+
+note right of [PositionRecalculator]
+  @Scheduled(fixedDelay = 10000)
+  Recalcula posiciones
+  Actualiza tiempos estimados
+end note
+
+@enduml

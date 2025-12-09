@@ -1,0 +1,56 @@
+@startuml Diagrama de Deployment - Docker Compose
+
+node "Docker Host" {
+    
+    node "Container: app" <<Spring Boot>> {
+        component "ticketero-app:latest" as App
+        note right
+          Puerto: 8080
+          Java 21 + Spring Boot 3.2
+          Virtual Threads habilitados
+        end note
+    }
+    
+    node "Container: postgres" <<Database>> {
+        database "PostgreSQL 15" as DB
+        note right
+          Puerto: 5432
+          Volume: postgres_data
+          Database: ticketero
+        end note
+    }
+    
+    node "Container: redis" <<Cache>> {
+        database "Redis 7" as Cache
+        note right
+          Puerto: 6379
+          Volume: redis_data
+          Persistencia: AOF
+        end note
+    }
+}
+
+cloud "Internet" {
+    actor "Cliente" as Cliente
+    actor "Ejecutivo" as Ejecutivo
+    actor "Supervisor" as Supervisor
+    cloud "Telegram Bot API" as Telegram
+}
+
+Cliente --> App : HTTP :8080\nPOST /api/tickets
+Ejecutivo --> App : WebSocket :8080\n/ws/dashboard
+Supervisor --> App : HTTP :8080\nGET /admin/dashboard
+
+App --> DB : JDBC :5432\nJPA Queries
+App --> Cache : Redis Protocol :6379\nCola mensajes + Cache
+App --> Telegram : HTTPS\nsendMessage API
+
+note bottom of App
+  **Environment Variables:**
+  - DB_USER
+  - DB_PASSWORD
+  - TELEGRAM_BOT_TOKEN
+  - TELEGRAM_BOT_USERNAME
+end note
+
+@enduml

@@ -1,0 +1,79 @@
+@startuml Secuencia - Asignación Automática de Ticket
+
+participant "AssignmentService" as Assignment
+participant "TicketRepository" as TicketRepo
+participant "AdvisorRepository" as AdvisorRepo
+database "PostgreSQL" as DB
+participant "TelegramService" as Telegram
+participant "AuditService" as Audit
+
+== Trigger: Ejecutivo se libera ==
+-> Assignment : liberarEjecutivo(advisorId)
+activate Assignment
+
+Assignment -> AdvisorRepo : updateStatus(advisorId, AVAILABLE)
+AdvisorRepo -> DB : UPDATE advisor SET status='AVAILABLE'
+DB --> AdvisorRepo : OK
+
+Assignment -> Assignment : asignarAutomaticamente()
+
+== Buscar siguiente ticket ==
+Assignment -> TicketRepo : findNextTicket()
+note right
+  SELECT * FROM ticket
+  WHERE status = 'EN_ESPERA'
+  ORDER BY 
+    queue_type.priority DESC,
+    created_at ASC
+  LIMIT 1
+end note
+TicketRepo -> DB : SELECT con ORDER BY prioridad
+DB --> TicketRepo : Ticket G01 (GERENCIA)
+
+== Buscar ejecutivo disponible ==
+Assignment -> AdvisorRepo : findAvailableAdvisor(queueType)
+note right
+  SELECT * FROM advisor
+  WHERE status = 'AVAILABLE'
+  AND 'GERENCIA' = ANY(queue_types)
+  ORDER BY assigned_tickets_count ASC
+  LIMIT 1
+end note
+AdvisorRepo -> DB : SELECT con balanceo de carga
+DB --> AdvisorRepo : Advisor "María González"
+
+== Asignar ==
+Assignment -> TicketRepo : assignTicket(ticketId, advisorId)
+TicketRepo -> DB : UPDATE ticket SET\nstatus='ATENDIENDO',\nassigned_advisor_id=1,\nassigned_module_number=3
+DB --> TicketRepo : OK
+
+Assignment -> AdvisorRepo : updateAdvisor(advisorId)
+AdvisorRepo -> DB : UPDATE advisor SET\nstatus='BUSY',\nassigned_tickets_count=count+1
+DB --> AdvisorRepo : OK
+
+== Notificar ==
+Assignment -> Telegram : enviarMensaje3(ticket)
+activate Telegram
+Telegram -> Telegram : programar en Redis
+note right
+  Mensaje 3:
+  "🔔 ¡ES TU TURNO G01!
+  Módulo: 3
+  Asesor: María González"
+end note
+deactivate Telegram
+
+Assignment -> Audit : registrarEvento(TICKET_ASIGNADO)
+activate Audit
+Audit -> DB : INSERT INTO audit_event
+deactivate Audit
+
+Assignment -> Assignment : recalcularPosiciones(GERENCIA)
+note right
+  Actualiza posiciones de
+  tickets restantes en cola
+end note
+
+deactivate Assignment
+
+@enduml

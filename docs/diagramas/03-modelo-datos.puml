@@ -1,0 +1,97 @@
+@startuml Modelo de Datos - Sistema Ticketero
+
+!define TABLE class
+!define PK <b><color:red>
+!define FK <color:blue>
+
+skinparam class {
+    BackgroundColor LightYellow
+    BorderColor Black
+}
+
+entity "ticket" as Ticket {
+    PK id : BIGSERIAL
+    --
+    codigo_referencia : UUID <<UNIQUE>>
+    numero : VARCHAR(10)
+    national_id : VARCHAR(20)
+    telefono : VARCHAR(20)
+    branch_office : VARCHAR(100)
+    queue_type : ENUM
+    status : ENUM
+    position_in_queue : INTEGER
+    estimated_wait_minutes : INTEGER
+    created_at : TIMESTAMP
+    FK assigned_advisor_id : BIGINT
+    assigned_module_number : INTEGER
+}
+
+entity "mensaje" as Message {
+    PK id : BIGSERIAL
+    --
+    FK ticket_id : BIGINT
+    plantilla : VARCHAR(50)
+    estado_envio : ENUM
+    fecha_programada : TIMESTAMP
+    fecha_envio : TIMESTAMP
+    telegram_message_id : VARCHAR(50)
+    intentos : INTEGER
+}
+
+entity "advisor" as Advisor {
+    PK id : BIGSERIAL
+    --
+    name : VARCHAR(100)
+    email : VARCHAR(100)
+    status : ENUM
+    module_number : INTEGER
+    assigned_tickets_count : INTEGER
+    queue_types : TEXT[]
+}
+
+entity "audit_event" as Audit {
+    PK id : BIGSERIAL
+    --
+    timestamp : TIMESTAMP
+    event_type : VARCHAR(50)
+    actor : VARCHAR(100)
+    entity_type : VARCHAR(50)
+    entity_id : VARCHAR(100)
+    previous_state : JSONB
+    new_state : JSONB
+    metadata : JSONB
+}
+
+Ticket "1" -- "N" Message : tiene >
+Advisor "1" -- "N" Ticket : atiende >
+
+note right of Ticket
+  **Estados:**
+  - EN_ESPERA
+  - PROXIMO
+  - ATENDIENDO
+  - COMPLETADO
+  - CANCELADO
+  - NO_ATENDIDO
+end note
+
+note right of Message
+  **Plantillas:**
+  - totem_ticket_creado
+  - totem_proximo_turno
+  - totem_es_tu_turno
+end note
+
+note right of Advisor
+  **Estados:**
+  - AVAILABLE
+  - BUSY
+  - OFFLINE
+end note
+
+note bottom of Audit
+  Tabla inmutable
+  Solo INSERT
+end note
+
+@enduml

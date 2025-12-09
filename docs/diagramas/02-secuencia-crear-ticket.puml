@@ -1,0 +1,57 @@
+@startuml Secuencia - Crear Ticket y Notificar
+
+actor Cliente
+participant "TicketController" as Controller
+participant "TicketService" as Service
+participant "TicketRepository" as Repository
+database "PostgreSQL" as DB
+participant "TelegramService" as Telegram
+queue "Redis\n(Cola Mensajes)" as Redis
+participant "Telegram API" as TelegramAPI
+
+== Crear Ticket ==
+Cliente -> Controller : POST /api/tickets\n{nationalId, telefono, queueType}
+activate Controller
+
+Controller -> Service : crearTicket(request)
+activate Service
+
+Service -> Repository : findActiveTicket(nationalId)
+Repository -> DB : SELECT * WHERE status IN ('EN_ESPERA'...)
+DB --> Repository : null (no existe)
+Repository --> Service : Optional.empty()
+
+Service -> Service : generarNumero(queueType)\n"C01"
+Service -> Service : calcularPosicion()\nposicion = 1
+
+Service -> Repository : save(ticket)
+Repository -> DB : INSERT INTO ticket
+DB --> Repository : ticket guardado
+Repository --> Service : Ticket entity
+
+Service -> Telegram : programarMensajes(ticket)
+activate Telegram
+Telegram -> Redis : LPUSH telegram:messages:pending\n{ticketId, plantilla, telefono}
+Redis --> Telegram : OK
+deactivate Telegram
+
+Service --> Controller : TicketResponse
+deactivate Service
+
+Controller --> Cliente : 201 Created\n{codigoReferencia, numero, posicion}
+deactivate Controller
+
+== Envío Asíncrono (Scheduler cada 5s) ==
+Telegram -> Redis : RPOP telegram:messages:pending
+activate Telegram
+Redis --> Telegram : mensaje pendiente
+
+Telegram -> TelegramAPI : POST sendMessage\n{chat_id, text}
+TelegramAPI --> Telegram : 200 OK\n{message_id: 12345}
+
+Telegram -> Repository : update(mensaje)\nestadoEnvio = ENVIADO
+Repository -> DB : UPDATE mensaje
+DB --> Repository : OK
+deactivate Telegram
+
+@enduml

@@ -1,0 +1,34 @@
+@startuml Diagrama de Contexto - Sistema Ticketero
+
+!define RECTANGLE class
+
+skinparam rectangle {
+    BackgroundColor<<system>> LightBlue
+    BackgroundColor<<person>> LightGreen
+    BackgroundColor<<external>> LightGray
+}
+
+rectangle "Cliente\n(Terminal Autoservicio)" as Cliente <<person>>
+rectangle "Ejecutivo\n(Dashboard)" as Ejecutivo <<person>>
+rectangle "Supervisor\n(Monitor)" as Supervisor <<person>>
+
+rectangle "Sistema Ticketero\nDigital" as Sistema <<system>> {
+}
+
+rectangle "Telegram Bot API" as Telegram <<external>>
+
+Cliente -down-> Sistema : 1. Crea ticket\n(POST /api/tickets)
+Sistema -right-> Telegram : 2. Envía notificaciones\n(sendMessage)
+Sistema -up-> Ejecutivo : 3. Asigna ticket\n(WebSocket)
+Ejecutivo -down-> Sistema : 4. Atiende cliente\n(PUT /status)
+Supervisor -left-> Sistema : 5. Monitorea operación\n(GET /dashboard)
+
+note right of Sistema
+  **Responsabilidades:**
+  - Gestionar colas de tickets
+  - Asignar automáticamente
+  - Notificar vía Telegram
+  - Auditar eventos
+end note
+
+@enduml
