@@ -1,0 +1,28 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Build artifacts
+target/
+build/
+dist/
+out/
+
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
